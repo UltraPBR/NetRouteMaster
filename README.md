@@ -9,5 +9,5 @@ Empower your network with precision routing, optimized for bypassing regional li
 
 شبکه خود را با مسیریابی دقیق، بهینه برای عبور از محدودیت‌های منطقه‌ای و در عین حال حفظ دسترسی روان به سرویس‌های داخلی، ارتقا دهید
 
-<pre> ```sh wget https://raw.githubusercontent.com/UltraPBR/NetRouteMaster/main/setup.sh -O /tmp/setup.sh && chmod +x /tmp/setup.sh && /tmp/setup.sh ``` </pre>
+<pre> ```bash wget https://raw.githubusercontent.com/UltraPBR/NetRouteMaster/main/setup.sh -O /tmp/setup.sh && chmod +x /tmp/setup.sh && /tmp/setup.sh ``` </pre>
 
