@@ -8,3 +8,4 @@ Empower your network with precision routing, optimized for bypassing regional li
 این اسکریپت هوشمند با پشتیبانی از چندین WAN، اسکن WiFi و اولویت‌بندی رابط‌ها، همه امکانات را در یک ابزار یکپارچه فراهم می‌کند.
 
 شبکه خود را با مسیریابی دقیق، بهینه برای عبور از محدودیت‌های منطقه‌ای و در عین حال حفظ دسترسی روان به سرویس‌های داخلی، ارتقا دهید
+wget https://raw.githubusercontent.com/UltraPBR/NetRouteMaster/main/setup.sh -O /tmp/setup.sh && chmod +x /tmp/setup.sh && /tmp/setup.sh
