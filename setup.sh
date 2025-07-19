@@ -21,9 +21,23 @@ check_root() {
 
 # === Install Required Packages ===
 install_packages() {
-    echo "⏳ Updating package lists and installing required packages..."
+    echo "⏳ Waiting for any existing opkg lock to be released..."
+    # Wait if another opkg process holds the lock
+    while [ -f /var/lock/opkg.lock ]; do
+        echo "🔒 opkg is busy, waiting..."
+        sleep 2
+    done
+
+    echo "⏳ Updating package lists..."
     opkg update || { echo "Error updating package lists!"; exit 1; }
+
+    echo "⏳ Installing required packages..."
     for pkg in pbr wireless-tools; do
+        # Wait again before each install
+        while [ -f /var/lock/opkg.lock ]; do
+            echo "🔒 opkg is busy, waiting..."
+            sleep 2
+        done
         opkg install "$pkg" || { echo "Failed to install $pkg."; exit 1; }
     done
     echo "✅ Packages installed successfully."
@@ -43,8 +57,8 @@ select_wan1() {
 
 # === Scan and Connect to WiFi ===
 scan_wifi() {
-    iface="$1"        # Interface to scan
-    target_net="$2"   # Network identifier (wan or wan2)
+    iface="$1"
+    target_net="$2"
     echo
     echo "Scanning 2.4GHz WiFi networks on $iface..."
     wifi detect >/dev/null 2>&1 || true
