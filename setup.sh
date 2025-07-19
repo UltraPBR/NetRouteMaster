@@ -38,7 +38,7 @@ select_wan1() {
     printf "عدد اینترفیس برای WAN1 (اینترنت بین‌الملل) را وارد کنید: "
     read idx
     WAN1_IF=$(ip -o link show | awk -F': ' '{print $2}' | sed -n "${idx}p")
-    echo "اینترفیس انتخاب‌شده برای WAN1: $WAN1_IF"
+    echo "✅ اینترفیس WAN1: $WAN1_IF"
 }
 
 # === اسکن و اتصال WiFi ===
@@ -48,16 +48,19 @@ scan_wifi() {
     echo
     echo "در حال اسکن شبکه‌های 2.4GHz روی اینترفیس $iface..."
     wifi detect >/dev/null 2>&1 || true
-    iwlist "$iface" scanning 2>/dev/null | grep -E 'Cell |ESSID' | nl -w2 -s'. ' | awk '{$1=""; sub(/^ /,""); print}'
+    iwlist "$iface" scanning 2>/dev/null \
+      | grep -E 'Cell |ESSID' \
+      | nl -w2 -s'. ' \
+      | awk '{$1=""; sub(/^ /,""); print}'
     echo
-    printf "شماره WiFi مدنظر را وارد کنید: "
+    printf "شماره WiFi را وارد کنید: "
     read wnum
-    SSID=$(iwlist "$iface" scanning 2>/dev/null | grep -E 'ESSID' | sed -n "${wnum}p" | cut -d'"' -f2)
+    SSID=$(iwlist "$iface" scanning 2>/dev/null \
+      | grep -E 'ESSID' \
+      | sed -n "${wnum}p" \
+      | cut -d'"' -f2)
     printf "رمز WiFi '$SSID' را وارد کنید: "
-    stty -echo
-    read PSK
-    stty echo
-    echo
+    stty -echo; read PSK; stty echo; echo
     echo "⏳ در حال پیکربندی WiFi..."
     uci delete wireless.@wifi-iface[0] 2>/dev/null || true
     uci set wireless.@wifi-iface[0]=wifi-iface
@@ -75,28 +78,24 @@ scan_wifi() {
 # === تنظیم WAN1 ===
 configure_wan1() {
     echo
-    printf "آیا می‌خواهید اینترنت بین‌الملل (WAN1) از طریق WiFi باشد؟ [y/N]: "
-    read use_wifi
-    case "$use_wifi" in
-        [Yy]*)
-            scan_wifi "$WAN1_IF" "wan"
-            ;;
-        *)
-            echo "✅ WAN1 روی اینترفیس $WAN1_IF تنظیم شد."
-            ;;
+    printf "آیا می‌خواهید WAN1 از طریق WiFi باشد؟ [y/N]: "
+    read yn
+    case "$yn" in
+        [Yy]*) scan_wifi "$WAN1_IF" "wan" ;;
+        *)      echo "✅ استفاده از اینترفیس $WAN1_IF برای WAN1" ;;
     esac
 }
 
-# === تنظیم WAN2 (Iran Internet) ===
+# === تنظیم WAN2 (اینترنت ایران) ===
 configure_wan2() {
     echo
     echo "🌐 تنظیم اینترنت ایران (WAN2/WWAN)"
     while :; do
         echo "1) استفاده از اینترفیس موجود"
-        echo "2) اتصال از طریق WiFi"
-        printf "عدد گزینه را وارد کنید [1-2]: "
-        read choice
-        case "$choice" in
+        echo "2) استفاده از WiFi"
+        printf "انتخاب شما [1-2]: "
+        read c
+        case "$c" in
             1)
                 printf "نام اینترفیس WAN2 را وارد کنید: "
                 read WAN2_IF
@@ -108,7 +107,7 @@ configure_wan2() {
                 break
                 ;;
             *)
-                echo "❌ لطفاً عدد 1 یا 2 را وارد کنید."
+                echo "❌ لطفاً 1 یا 2 را وارد کنید."
                 ;;
         esac
     done
@@ -124,19 +123,19 @@ apply_pbr() {
     uci set pbr.@global[0].interfaces="$WAN1_IF $WAN2_IF"
     uci commit pbr
 
-    echo "⏳ دانلود لیست IP ایران..."
     mkdir -p /etc/pbr
-    wget -qO /etc/pbr/iran_ip_list.txt https://raw.githubusercontent.com/UltraPBR/Lists/main/iran_ip_list.txt || true
+    echo "⏳ دانلود لیست IP ایران..."
+    wget -qO /etc/pbr/iran_ip_list.txt \
+      https://raw.githubusercontent.com/UltraPBR/Lists/main/iran_ip_list.txt || true
 
     echo "⏳ دانلود لیست دامنه‌های ایران..."
-    wget -qO /etc/pbr/iran_domain_list.txt https://raw.githubusercontent.com/UltraPBR/Lists/main/iran_domain_list.txt || true
+    wget -qO /etc/pbr/iran_domain_list.txt \
+      https://raw.githubusercontent.com/UltraPBR/Lists/main/iran_domain_list.txt || true
 
-    # سیاست‌ها
     pbr route add name IranRoutes ips /etc/pbr/iran_ip_list.txt gateway "$WAN2_IF" priority 10
     pbr route add name IranDomains domains /etc/pbr/iran_domain_list.txt gateway "$WAN2_IF" priority 20
     pbr route add name DefaultAll gateway "$WAN1_IF" priority 100
-
-    echo "✅ سیاست‌های PBR با موفقیت تنظیم شدند."
+    echo "✅ سیاست‌های PBR تنظیم شد."
 }
 
 # === تغییر IP LAN ===
@@ -152,10 +151,8 @@ set_lan_ip() {
 rebrand_luci() {
     echo
     echo "🎨 تغییر هدر LuCI به 'by-UltraPBR'"
-    HEADER="/usr/lib/lua/luci/view/themes/bootstrap/header.htm"
-    if [ -f "$HEADER" ]; then
-        sed -i "s/OpenWrt/by-UltraPBR/g" "$HEADER"
-    fi
+    H="/usr/lib/lua/luci/view/themes/bootstrap/header.htm"
+    [ -f "$H" ] && sed -i "s/OpenWrt/by-UltraPBR/g" "$H"
 }
 
 # === ری‌استارت سرویس‌ها ===
@@ -167,7 +164,7 @@ restart_services() {
     /etc/init.d/pbr restart
 }
 
-# === اجرای مراحل ===
+# === اجرای همه مراحل ===
 show_banner
 check_root
 install_packages
