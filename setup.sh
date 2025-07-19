@@ -60,17 +60,18 @@ scan_wifi() {
     echo
     echo "Scanning 2.4GHz WiFi networks on $iface..."
     wifi detect >/dev/null 2>&1 || true
+    # List only SSIDs with numbering, using sed + awk to avoid 'nl'
     iwlist "$iface" scanning 2>/dev/null \
-      | grep -E 'Cell |ESSID' \
-      | nl -w2 -s'. ' \
-      | awk '{$1=""; sub(/^ /,""); print}'
+      | grep 'ESSID' \
+      | sed -n 's/.*ESSID:"\(.*\)"/\1/p' \
+      | awk '{print NR ". " $0}'
     echo
     printf "Enter WiFi number: "
     read -r wnum
     SSID=$(iwlist "$iface" scanning 2>/dev/null \
-      | grep -E 'ESSID' \
-      | sed -n "${wnum}p" \
-      | cut -d'\"' -f2)
+      | grep 'ESSID' \
+      | sed -n 's/.*ESSID:"\(.*\)"/\1/p' \
+      | sed -n "${wnum}p")
     printf "Enter password for '$SSID': "
     stty -echo; read -r PSK; stty echo; echo
     echo "⏳ Configuring WiFi connection..."
@@ -186,4 +187,4 @@ rebrand_luci
 restart_services
 
 echo
-echo "✅ UltraPBR setup completed successfully! Goodbye from UltraPBR 👋🚀"
+
