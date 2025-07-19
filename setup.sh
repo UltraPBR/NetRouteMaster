@@ -59,21 +59,22 @@ scan_wifi() {
     target_net="$2"
     echo
     echo "Scanning 2.4GHz WiFi networks on $iface..."
-    wifi detect >/dev/null 2>&1 || true
-    # List only SSIDs with numbering, using sed + awk to avoid 'nl'
-    iwlist "$iface" scanning 2>/dev/null \
-      | grep 'ESSID' \
-      | sed -n 's/.*ESSID:"\(.*\)"/\1/p' \
-      | awk '{print NR ". " $0}'
+    SSID_LIST=$(iwinfo "$iface" scan 2>/dev/null | awk -F'SSID: ' '/SSID:/ {print $2}')
+    if [ -z "$SSID_LIST" ]; then
+        echo "❌ No WiFi networks found on $iface.";
+        return 1
+    fi
+    echo "$SSID_LIST" | awk '{print NR". " $0}'
     echo
     printf "Enter WiFi number: "
     read -r wnum
-    SSID=$(iwlist "$iface" scanning 2>/dev/null \
-      | grep 'ESSID' \
-      | sed -n 's/.*ESSID:"\(.*\)"/\1/p' \
-      | sed -n "${wnum}p")
+    SSID=$(echo "$SSID_LIST" | sed -n "${wnum}p")
+    if [ -z "$SSID" ]; then
+        echo "❌ Invalid selection.";
+        return 1
+    fi
     printf "Enter password for '$SSID': "
-    stty -echo; read -r PSK; stty echo; echo
+    read -r PSK
     echo "⏳ Configuring WiFi connection..."
     uci delete wireless.@wifi-iface[0] 2>/dev/null || true
     uci set wireless.@wifi-iface[0]=wifi-iface
@@ -86,6 +87,7 @@ scan_wifi() {
     uci commit wireless
     wifi reload
     echo "✅ WiFi connected and configured."
+    return 0
 }
 
 # === Configure WAN1 ===
@@ -94,7 +96,12 @@ configure_wan1() {
     printf "Do you want WAN1 via WiFi? [y/N]: "
     read -r yn
     case "$yn" in
-        [Yy]* ) scan_wifi "$WAN1_IF" "wan" ;;
+        [Yy]* )
+            until scan_wifi "$WAN1_IF" "wan"; do
+                echo "Retrying WiFi scan for WAN1..."
+                sleep 1
+            done
+            ;;
         *     ) echo "✅ Using interface $WAN1_IF for WAN1." ;;
     esac
 }
@@ -115,7 +122,10 @@ configure_wan2() {
                 break
                 ;;
             2* )
-                scan_wifi "radio0" "wan2"
+                until scan_wifi "radio0" "wan2"; do
+                    echo "Retrying WiFi scan for WAN2..."
+                    sleep 1
+                done
                 WAN2_IF="wan2"
                 break
                 ;;
@@ -187,4 +197,4 @@ rebrand_luci
 restart_services
 
 echo
-
+echo "✅ UltraPBR setup completed successfully! Goodbye from UltraPBR 👋🚀"
