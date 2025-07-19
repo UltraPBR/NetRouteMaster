@@ -1,58 +1,48 @@
-#!/bin/sh
+#!/bin/bash
 
 # Load Banner
 clear
-[ -f banner.txt ] && cat banner.txt
+wget -O /tmp/banner.txt https://raw.githubusercontent.com/UltraPBR/NetRouteMaster/main/banner.txt 2>/dev/null
+cat /tmp/banner.txt
 
 echo "Welcome to UltraPBR Setup!"
+echo
 
-# Install pbr package
-echo "Installing pbr package..."
-if command -v opkg >/dev/null 2>&1; then
-    opkg update && opkg install pbr
-else
-    echo "opkg not found! Are you sure this is OpenWrt?"
-fi
+# Install required packages
+echo "Installing necessary packages..."
+opkg update
+opkg install pbr wireless-tools uhttpd luci
 
 # Step 1: WAN1
-echo "\nStep 1: Setup WAN1 (International Internet)"
-echo -n "Enter WAN1 interface name (e.g., wan): "
-read WAN1_INTERFACE
+echo -e "\nStep 1: Setup WAN1 (International Internet)"
+read -p "Enter WAN1 interface name (e.g., wan): " WAN1_INTERFACE
 
 # Step 2: Iran Network
-echo "\nStep 2: Setup Iran Network (WAN2 or WWAN)"
-echo -n "Do you have a second WAN port? (y/n): "
-read HAS_WAN2
+echo -e "\nStep 2: Setup Iran Network (WAN2 or WWAN)"
+read -p "Do you have a second WAN port? (y/n): " HAS_WAN2
 
-if [ "$HAS_WAN2" = "y" ]; then
-    echo -n "Enter WAN2 interface name: "
-    read WAN2_INTERFACE
+if [[ $HAS_WAN2 == "y" ]]; then
+    read -p "Enter WAN2 interface name: " WAN2_INTERFACE
 else
     echo "Scanning for available WiFi networks on 2.4GHz..."
-    if command -v iwlist >/dev/null 2>&1; then
-        iwlist wlan0 scan | grep 'ESSID' | nl
-    else
-        echo "iwlist not available! Please install wireless-tools."
-    fi
-    echo -n "Select WiFi number to connect: "
-    read WIFI_NUMBER
-    echo -n "Enter WiFi Password: "
-    read WIFI_PASS
-    echo "Connecting to selected WiFi (Simulated) #$WIFI_NUMBER ..."
+    iwlist wlan0 scan | grep 'ESSID' | nl
+    read -p "Select WiFi number to connect: " WIFI_NUMBER
+    read -p "Enter WiFi Password: " WIFI_PASS
+    echo "(Simulated) Connecting to WiFi #$WIFI_NUMBER with provided password."
     WAN2_INTERFACE="wwan"
 fi
 
-# Apply PBR configs
-echo "\nApplying PBR rules..."
+# Download Iran Domains and IPs
+echo -e "\nFetching Iran domains and IP lists..."
+wget -O /etc/iran_domain_list https://raw.githubusercontent.com/UltraPBR/NetRouteMaster/main/iran_domains.txt
+wget -O /etc/iran_ip_list https://raw.githubusercontent.com/UltraPBR/NetRouteMaster/main/iran_ips.txt
 
+# Apply PBR configs
+echo -e "\nApplying PBR rules..."
 uci set pbr.config.strict_enforcement='1'
 uci set pbr.config.supported_interface="$WAN1_INTERFACE $WAN2_INTERFACE"
 uci commit pbr
 /etc/init.d/pbr restart
-
-# Load IPs and Domains
-cp iran_domains.txt /etc/iran_domain_list
-cp iran_ips.txt /etc/iran_ip_list
 
 uci add pbr policy
 uci set pbr.@policy[-1].name='Iran Routes'
@@ -72,18 +62,20 @@ uci commit pbr
 /etc/init.d/pbr restart
 
 # Change Router LAN IP
+echo -e "\nChanging router LAN IP to 192.168.200.1..."
 uci set network.lan.ipaddr='192.168.200.1'
 uci set network.lan.netmask='255.255.255.0'
 uci commit network
 
 # Change LuCI header
-uci set luci.main.mediaurlbase='/luci-static/bootstrap'
 uci set luci.main.title='by-UltraPBR'
 uci commit luci
 
-/etc/init.d/network restart
-/etc/init.d/uhttpd restart
+# Delayed network and uhttpd restart
+echo -e "\nNetwork and web services will restart in 15 seconds. Please reconnect using 192.168.200.1 after that."
+(sleep 15 && /etc/init.d/network restart && /etc/init.d/uhttpd restart) &
 
-echo "\n✅ UltraPBR setup completed successfully!"
-echo "Enjoy seamless routing of Iran and International traffic!"
+echo -e "\n✅ UltraPBR setup completed successfully!"
+echo "Reconnect to your router via SSH at: 192.168.200.1"
 echo "Goodbye from UltraPBR 👋🚀"
+
