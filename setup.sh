@@ -22,7 +22,6 @@ check_root() {
 # === Install Required Packages ===
 install_packages() {
     echo "⏳ Waiting for any existing opkg lock to be released..."
-    # Wait if another opkg process holds the lock
     while [ -f /var/lock/opkg.lock ]; do
         echo "🔒 opkg is busy, waiting..."
         sleep 2
@@ -33,7 +32,6 @@ install_packages() {
 
     echo "⏳ Installing required packages..."
     for pkg in pbr wireless-tools; do
-        # Wait again before each install
         while [ -f /var/lock/opkg.lock ]; do
             echo "🔒 opkg is busy, waiting..."
             sleep 2
@@ -50,7 +48,7 @@ select_wan1() {
     ip -o link show | awk -F': ' '{print NR": "$2}'
     echo
     printf "Enter the number of the interface for WAN1 (International Internet): "
-    read idx
+    read -r idx
     WAN1_IF=$(ip -o link show | awk -F': ' '{print $2}' | sed -n "${idx}p")
     echo "✅ WAN1 interface: $WAN1_IF"
 }
@@ -68,13 +66,13 @@ scan_wifi() {
       | awk '{$1=""; sub(/^ /,""); print}'
     echo
     printf "Enter WiFi number: "
-    read wnum
+    read -r wnum
     SSID=$(iwlist "$iface" scanning 2>/dev/null \
       | grep -E 'ESSID' \
       | sed -n "${wnum}p" \
       | cut -d'\"' -f2)
     printf "Enter password for '$SSID': "
-    stty -echo; read PSK; stty echo; echo
+    stty -echo; read -r PSK; stty echo; echo
     echo "⏳ Configuring WiFi connection..."
     uci delete wireless.@wifi-iface[0] 2>/dev/null || true
     uci set wireless.@wifi-iface[0]=wifi-iface
@@ -93,10 +91,10 @@ scan_wifi() {
 configure_wan1() {
     echo
     printf "Do you want WAN1 via WiFi? [y/N]: "
-    read yn
+    read -r yn
     case "$yn" in
-        [Yy]*) scan_wifi "$WAN1_IF" "wan" ;;
-        *)      echo "✅ Using interface $WAN1_IF for WAN1." ;;
+        [Yy]* ) scan_wifi "$WAN1_IF" "wan" ;;
+        *     ) echo "✅ Using interface $WAN1_IF for WAN1." ;;
     esac
 }
 
@@ -104,23 +102,23 @@ configure_wan1() {
 configure_wan2() {
     echo
     echo "🌐 Configuring Iran Internet (WAN2/WWAN)"
-    while :; do
+    while true; do
         echo "1) Use existing interface"
         echo "2) Use WiFi"
         printf "Your choice [1-2]: "
-        read c
+        read -r c
         case "$c" in
-            1)
+            1* )
                 printf "Enter the name of the WAN2 interface: "
-                read WAN2_IF
+                read -r WAN2_IF
                 break
                 ;;
-            2)
+            2* )
                 scan_wifi "radio0" "wan2"
                 WAN2_IF="wan2"
                 break
                 ;;
-            *)
+            *  )
                 echo "❌ Please enter 1 or 2."
                 ;;
         esac
@@ -139,12 +137,9 @@ apply_pbr() {
 
     mkdir -p /etc/pbr
     echo "⏳ Downloading Iran IP list..."
-    wget -qO /etc/pbr/iran_ip_list.txt \
-      https://raw.githubusercontent.com/UltraPBR/Lists/main/iran_ip_list.txt || true
-
+    wget -qO /etc/pbr/iran_ip_list.txt https://raw.githubusercontent.com/UltraPBR/Lists/main/iran_ip_list.txt || true
     echo "⏳ Downloading Iran domain list..."
-    wget -qO /etc/pbr/iran_domain_list.txt \
-      https://raw.githubusercontent.com/UltraPBR/Lists/main/iran_domain_list.txt || true
+    wget -qO /etc/pbr/iran_domain_list.txt https://raw.githubusercontent.com/UltraPBR/Lists/main/iran_domain_list.txt || true
 
     pbr route add name IranRoutes ips /etc/pbr/iran_ip_list.txt gateway "$WAN2_IF" priority 10
     pbr route add name IranDomains domains /etc/pbr/iran_domain_list.txt gateway "$WAN2_IF" priority 20
@@ -191,3 +186,4 @@ rebrand_luci
 restart_services
 
 echo
+echo "✅ UltraPBR setup completed successfully! Goodbye from UltraPBR 👋🚀"
